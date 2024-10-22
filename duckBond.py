@@ -1,97 +1,88 @@
-import time
+import asyncio
 
-from solders.pubkey import Pubkey
-from solana.rpc.api import Client
-from solana.transaction import Transaction, AccountMeta, Instruction
-from struct import pack
-client = Client("https://api.mainnet-beta.solana.com")
-# 替换为实际值
-contract_address = Pubkey.from_string("pvwX4B67eRRjBGQ4jJUtiUJEFQbR4bvG6Wbe6mkCjtt")
-token_program_id = Pubkey.from_string("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")
-mint_address = Pubkey.from_string("")  # 替换为你的 mint 地址
-destination_account = Pubkey.from_string("")  # 接收者地址
-
-# print(client.get_balance(destination_account))
-# 要铸造的数量（以最小单位表示）
-transaction = Transaction()
-
-instruction0 = Instruction(
-    program_id=Pubkey.from_string("ComputeBudget111111111111111111111111111111"),
-    data=bytes.fromhex('03250a2a0000000000'),
-    accounts=[],
-)
-transaction.add(instruction0)
-
-instruction1 = Instruction(
-    program_id=Pubkey.from_string("ComputeBudget111111111111111111111111111111"),
-    data=bytes.fromhex('02400d0300'),
-    accounts=[],
-)
-transaction.add(instruction1)
-# 创建自定义 Instruction 对象
-instruction = Instruction(
-    program_id=contract_address,
-    data=bytes.fromhex('3b8418f67a2708f3'),
-    accounts=[
-        AccountMeta(pubkey=Pubkey.from_string("4ALKS249vAS3WSCUxXtHJVZN753kZV6ucEQC41421Rka"), is_signer=False,
-                    is_writable=True),
-        AccountMeta(pubkey=Pubkey.from_string("EEQGqAnxRoF7jixtxsLJk8o52JhBoDGtjmWAwvt6EJQE"), is_signer=False,
-                    is_writable=True),
-        AccountMeta(pubkey=Pubkey.from_string("DH7oGhZLxhmZkA1spAJEBB52MxTs4UTGuXYNYWoAUNCN"), is_signer=False,
-                    is_writable=True),
-        AccountMeta(pubkey=Pubkey.from_string("AmTonSS41ya3i7Cd5hgYiNJXhvrc6wP1EKngrJZ72Vvr"), is_signer=False,
-                    is_writable=True),
-        AccountMeta(pubkey=destination_account, is_signer=False, is_writable=True),
-        AccountMeta(pubkey=Pubkey.from_string("2eAgG1UDRZrAE24rBRhTeSrk3wWYKHJSeXFHj9Skj8gV"), is_signer=False,
-                    is_writable=False),
-        AccountMeta(pubkey=Pubkey.from_string("Sysvar1nstructions1111111111111111111111111"), is_signer=False,
-                    is_writable=False),
-        AccountMeta(pubkey=Pubkey.from_string("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"), is_signer=False,
-                    is_writable=False),
-        AccountMeta(pubkey=token_program_id, is_signer=False, is_writable=False),
-        AccountMeta(pubkey=Pubkey.from_string("11111111111111111111111111111111"), is_signer=False,
-                    is_writable=False),
-        AccountMeta(pubkey=Pubkey.from_string("SysvarRent111111111111111111111111111111111"), is_signer=False,
-                    is_writable=False),
-    ],
-)
-transaction.add(instruction)
-transaction.fee_payer = destination_account
-
-for i in range(100):
-
-    # 然后继续签名并发送交易...
-    recent_blockhash_response = client.get_latest_blockhash()
-    if recent_blockhash_response.value:
-        transaction.recent_blockhash = recent_blockhash_response.value.blockhash
-    else:
-        print(f"Error fetching block hash: {recent_blockhash_response}")
+from loguru import logger
+from solana.rpc.async_api import AsyncClient
+from solana.transaction import Transaction, Instruction, AccountMeta
+from solana.rpc import commitment
+from solana.rpc.types import Pubkey
+from solders import compute_budget
+from solders.token import associated
+from solders.keypair import Keypair
 
 
-    # print("Recent Blockhash:", transaction.recent_blockhash)
-    # print("Fee Payer:", transaction.fee_payer)
-    # print("Instructions:")
-    # for instruction in transaction.instructions:
-    #     print(f"  Program ID: {instruction.program_id}")
-    #     print(f"  Accounts: {[str(account) for account in instruction.accounts]}")
-    #     print(f"  Data: {instruction.data.hex()}")
+class Duck:
+    def __init__(self, private_key):
+        self.keypair = Keypair.from_base58_string(private_key)
+        self.sol_client = AsyncClient("https://cold-hanni-fast-mainnet.helius-rpc.com")
 
-    try:
-        from solders.keypair import Keypair
+    async def mint(self):
+        try:
+            logger.info('start mint ……')
+            program_id = Pubkey.from_string('pvwX4B67eRRjBGQ4jJUtiUJEFQbR4bvG6Wbe6mkCjtt')
+            token_id = Pubkey.from_string('4ALKS249vAS3WSCUxXtHJVZN753kZV6ucEQC41421Rka')
+            config_id = Pubkey.from_string('B4cAqfPKtzsqm5mxDk4JkbvPPJoKyXNMyzj5X8SMfdQn')
+            instruction_sysvar = Pubkey.from_string('Sysvar1nstructions1111111111111111111111111')
+            associated_token_program = Pubkey.from_string('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL')
+            token_program = Pubkey.from_string('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
+            system_program = Pubkey.from_string('11111111111111111111111111111111')
+            rent = Pubkey.from_string('SysvarRent111111111111111111111111111111111')
 
-        keypair = Keypair.from_base58_string("")  # 请将其替换成实际私钥
+            user_state_seeds = [b'user_state', self.keypair.pubkey().__bytes__()]
+            user_state = Pubkey.find_program_address(user_state_seeds, program_id)[0]
 
-        # 签名事务，这一步很重要。
-        transaction.sign(keypair)
+            user_ata = associated.get_associated_token_address(self.keypair.pubkey(), token_id)
 
-        # 序列化已签名的交易，以便发送。
-        serialized_txn = transaction.serialize()
+            config_seeds = [b'config', config_id.__bytes__()]
+            config = Pubkey.find_program_address(config_seeds, program_id)[0]
 
-        response_send_txn: str = client.send_transaction(serialized_txn)  # 注意这里只传递已序列化且已签名的 transaction
+            mint_authority_seeds = [b'mint_authority', config.__bytes__()]
+            mint_authority = Pubkey.find_program_address(mint_authority_seeds, program_id)[0]
 
-        print(f"Transaction Response: {response_send_txn}")
-    except Exception as e:
-        print(f"Error sending transaction: {str(e)}")
+            recent_blockhash = await self.sol_client.get_latest_blockhash(commitment=commitment.Confirmed)
+            transaction = Transaction(recent_blockhash=recent_blockhash.value.blockhash, fee_payer=self.keypair.pubkey())
 
-    time.sleep(60)
-    # print(client.get_balance(destination_account))
+            priority_fee = compute_budget.set_compute_unit_price(int(PriorityFee * 1e9))
+            transaction.add(priority_fee)
+
+            transaction.add(Instruction(
+                program_id=program_id,
+                accounts=[
+                    AccountMeta(pubkey=token_id, is_signer=False, is_writable=True),
+                    AccountMeta(pubkey=config, is_signer=False, is_writable=True),
+                    AccountMeta(pubkey=user_ata, is_signer=False, is_writable=True),
+                    AccountMeta(pubkey=user_state, is_signer=False, is_writable=True),
+                    AccountMeta(pubkey=self.keypair.pubkey(), is_signer=True, is_writable=True),
+                    AccountMeta(pubkey=mint_authority, is_signer=False, is_writable=False),
+                    AccountMeta(pubkey=instruction_sysvar, is_signer=False, is_writable=False),
+                    AccountMeta(pubkey=associated_token_program, is_signer=False, is_writable=False),
+                    AccountMeta(pubkey=token_program, is_signer=False, is_writable=False),
+                    AccountMeta(pubkey=system_program, is_signer=False, is_writable=False),
+                    AccountMeta(pubkey=rent, is_signer=False, is_writable=False)
+                ],
+                data=bytes.fromhex('3b8418f67a2708f3')
+            ))
+
+            signature = await self.sol_client.send_transaction(transaction, self.keypair)
+
+            resp = await self.sol_client.confirm_transaction(signature.value, commitment=commitment.Confirmed)
+            if resp.value[0].err is None:
+                logger.success("mint success")
+                return True
+        except Exception as e:
+            logger.error(f"mint failed: {e}")
+
+
+async def main(private_key):
+    duck = Duck(private_key)
+    mint_times = 200
+
+    while mint_times > 0:
+        success = await duck.mint()
+        if success:
+            mint_times -= 1
+
+
+if __name__ == '__main__':
+    PriorityFee = 0.001
+    PrivateKey = ''
+    asyncio.run(main(PrivateKey))
